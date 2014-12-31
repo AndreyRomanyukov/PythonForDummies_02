@@ -1,0 +1,17 @@
+<html>
+   <head>
+      <title>{{artist_name}}</title>
+   </head>
+   <body>
+     <div>{{artist_name}}</div>
+     <ul>
+         {% if albums.rowcount != 0 %}
+             {% for album in albums %}
+                 <li>{{album['name']}} ({{album['year']}})</li>
+             {% end %}
+         {% else %}
+             <li>No albums added yet</li>
+         {% end %}
+     </ul>
+   </body>
+ </html>

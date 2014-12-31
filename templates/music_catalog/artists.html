@@ -1,0 +1,13 @@
+<html>
+   <head>
+      <title>Artists</title>
+   </head>
+   <body>
+     <div>Artists:</div>
+     <ul>
+         {% for artist in artists %}
+             <li><a href="/artists/{{artist['name']}}">{{artist['name']}}</a></li>
+         {% end %}
+     </ul>
+   </body>
+ </html>
