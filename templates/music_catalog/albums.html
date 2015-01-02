@@ -5,9 +5,9 @@
    <body>
      <div>{{artist_name}}</div>
      <ul>
-         {% if albums.rowcount != 0 %}
+         {% if albums.count() != 0 %}
              {% for album in albums %}
-                 <li>{{album['name']}} ({{album['year']}})</li>
+                 <li>{{album.name}} ({{album.year}})</li>
              {% end %}
          {% else %}
              <li>No albums added yet</li>

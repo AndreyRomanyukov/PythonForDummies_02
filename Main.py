@@ -8,6 +8,12 @@ import tornado.web
 import os
 import datetime
 from sqlalchemy import create_engine
+from sqlalchemy import orm
+from sqlalchemy import Table, MetaData
+from sqlalchemy import func
+from sqlalchemy.orm.exc import NoResultFound
+import json
+
 import urllib2
 
 
@@ -19,6 +25,22 @@ application_settings = {"debug": True,
                         "static_path": os.path.join(os.path.dirname(__file__), "static"),
                        }
 db = create_engine('postgresql://postgres:root@localhost:5432/postgres')
+db_meta = MetaData(bind=db, schema='music_catalog', reflect=True)
+orm_session = orm.Session(bind=db)
+
+
+class Artist(object):
+    pass
+
+
+orm.Mapper(Artist, db_meta.tables['music_catalog.artists'])
+
+
+class Album(object):
+    pass
+
+
+orm.Mapper(Album, db_meta.tables['music_catalog.albums'])
 
 
 class HomePageHandler(tornado.web.RequestHandler):
@@ -42,7 +64,9 @@ class Echo2PageHandler(tornado.web.RequestHandler):
 
 class ArtistsPageHandler(tornado.web.RequestHandler):
     def get(self):
-        artists = db.execute('SELECT * FROM music_catalog.artists WHERE deleted <> TRUE ORDER BY name')
+        artists = orm_session.query(Artist).\
+                              order_by(Artist.name).\
+                              filter(Artist.deleted != True)
 
         self.render("templates/music_catalog/artists.html",
                     artists = artists)
@@ -51,19 +75,134 @@ class ArtistPageHandler(tornado.web.RequestHandler):
     def get(self):
         uri = self.request.uri
         artist_name = uri.split('/')[-1]
-        albums = db.execute('SELECT * FROM music_catalog.albums WHERE artist_id = (SELECT id FROM music_catalog.artists WHERE lower(name) = lower(%s) AND deleted != TRUE)', artist_name)
+
+        albums = orm_session.query(Album).\
+                             join(Artist, Album.artist_id == Artist.id).\
+                             filter(func.lower(Artist.name) == artist_name.lower()).\
+                             order_by(Album.year)
 
         self.render("templates/music_catalog/albums.html",
-                    artist_name = urllib2.unquote(artist_name),
-                    albums = albums)
+            artist_name = urllib2.unquote(artist_name),
+            albums = albums)
+
+
+class AddArtistPageHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.render("templates/music_catalog/add_artist.html")
+
+
+class DeleteArtistPageHandler(tornado.web.RequestHandler):
+    def get(self):
+        uri = self.request.uri
+        artist_id = uri.split('/')[-1]
+
+        try:
+            artist = orm_session.query(Artist).\
+                          filter(Artist.id == artist_id).\
+                          one()
+
+            self.render("templates/music_catalog/delete_artist.html",
+                        artist = artist)
+        except NoResultFound, e:
+            pass #TODO сделать ex
+
+
+class UpdateArtistPageHandler(tornado.web.RequestHandler):
+    def get(self):
+        uri = self.request.uri
+        artist_id = uri.split('/')[-1]
+
+        try:
+            artist = orm_session.query(Artist).\
+                          filter(Artist.id == artist_id).\
+                          one()
+
+            self.render("templates/music_catalog/update_artist.html",
+                        artist = artist)
+        except NoResultFound, e:
+            pass #TODO сделать ex
 
 
 class AjaxEcho(tornado.web.RequestHandler):
     #@is_ajax # is_ajax decorators.
     def get(self):
-        if (self.get_argument("f", default=None, strip=False) == "getSimpleAnswer"):
+        function_name = self.get_argument("f", default=None, strip=False)
+
+        if (function_name == "getSimpleAnswer"):
             result = str(datetime.datetime.now().time().isoformat()) + " SimpleAnswer: OK!"
             json_result = '{{"result": "{0}"}}'.format(result)
+            self.write(json_result)
+        elif (function_name == "getArtist"):
+            result = "false"
+
+            artist_id = self.get_argument("id", default=None, strip=False)
+
+            try:
+                artist = orm_session.query(Artist).\
+                              filter(Artist.id == artist_id).\
+                              one()
+
+                json_result = '{{"id": "{0}", "name": "{0}"}}'.format(artist.name.id, artist.name)
+            except NoResultFound, e:
+                json_result = '{{"result": "{0}"}}'.format("NoResultFound")
+
+            self.write(json_result)
+        elif (function_name == "ifArtistExist"):
+            result = "false"
+
+            artist_name = self.get_argument("name", default=None, strip=False)
+
+            artists = orm_session.query(Artist).\
+                                  filter(func.lower(Artist.name) == artist_name.lower()).\
+                                  filter(Artist.deleted != True)
+
+            if (artists.count() > 0):
+                result = "true"
+
+            json_result = '{{"result": "{0}"}}'.format(result)
+            self.write(json_result)
+        elif (function_name == "insertArtist"):
+            result = -1
+
+            artist_name = self.get_argument("name", default=None, strip=False)
+
+            newArtist = Artist()
+            newArtist.name = artist_name
+
+            orm_session.add(newArtist)
+            orm_session.commit()
+
+            result = newArtist.id
+
+            json_result = json.dumps({"id": result}, separators=(',',':'))
+            self.write(json_result)
+        elif (function_name == "deleteArtist"):
+            artist_id = self.get_argument("id", default=None, strip=False)
+
+            artist = orm_session.query(Artist).\
+                          filter(Artist.id == artist_id).\
+                          one()
+
+            artist.deleted = True
+            orm_session.commit()
+
+            json_result = '{{"result": "{0}"}}'.format("ok")
+
+            self.write(json_result)
+        elif (function_name == "updateArtist"):
+            artist_id = self.get_argument("id", default=None, strip=False)
+            artist_name = self.get_argument("name", default=None, strip=False)
+
+            artist = orm_session.query(Artist).\
+                          filter(Artist.id == artist_id).\
+                          one()
+
+            artist.name = artist_name
+
+            orm_session.commit()
+
+            json_result = '{{"result": "{0}"}}'.format("ok")
+
             self.write(json_result)
         else:
             result = str(datetime.datetime.now().time().isoformat()) + " This function is not implemented yet"
@@ -80,7 +219,12 @@ def main():
         [
             (r"/", HomePageHandler),
             (r"/server", AjaxEcho),
+            (r"/artists", ArtistsPageHandler),
             (r"/artists/", ArtistsPageHandler),
+            (r"/AddArtist", AddArtistPageHandler),
+            (r"/AddArtist/", AddArtistPageHandler),
+            (r"/DeleteArtist/.*", DeleteArtistPageHandler),
+            (r"/UpdateArtist/.*", UpdateArtistPageHandler),
             (r"/artists/.*", ArtistPageHandler),
             (r"/examples/echo1.html", Echo1PageHandler),
             (r"/examples/echo2.html", Echo2PageHandler),

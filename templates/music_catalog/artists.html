@@ -1,13 +1,26 @@
 <html>
-   <head>
-      <title>Artists</title>
-   </head>
-   <body>
-     <div>Artists:</div>
-     <ul>
-         {% for artist in artists %}
-             <li><a href="/artists/{{artist['name']}}">{{artist['name']}}</a></li>
-         {% end %}
-     </ul>
-   </body>
+    <head>
+        <title>Artists</title>
+
+        <script language="javascript" type="text/javascript" src="../static/scripts/jquery-1.11.2.js"></script>
+        <script language="javascript" type="text/javascript" src="../static/scripts/artists.js"></script>
+    </head>
+    <body>
+        <div align="center">
+        <div>Artists:</div>
+        <button class="clsBtnAddNewArtist">Add New Artist</button>
+        <table border="0" style="border:none">
+            {% for artist in artists %}
+                <tr>
+                    <div class="artist">
+                        <td><a href="/artists/{{artist.name}}">{{artist.name}}</a></td>
+                        <td><button class="clsBtnUpdateArtist" id="{{artist.id}}">Update</button></td>
+                        <td><button class="clsBtnDeleteArtist" id="{{artist.id}}">Delete</button></td>
+                    </div>
+                </tr>
+            {% end %}
+        </table>
+        <button class="clsBtnAddNewArtist">Add New Artist</button>
+        </div>
+    </body>
  </html>

@@ -1,0 +1,29 @@
+<html>
+    <head>
+        <title>Artists</title>
+
+        <script language="javascript" type="text/javascript" src="../static/scripts/jquery-1.11.2.js"></script>
+        <script language="javascript" type="text/javascript" src="../static/scripts/ajaxDataProvider.js"></script>
+        <script language="javascript" type="text/javascript" src="../static/scripts/update_artist.js"></script>
+    </head>
+    <body>
+        <div>Update Artist:</div>
+        <div>
+            <table border="0" style="border:none">
+                <tr>
+                    <td><label>id: </label></td>
+                    <td><label>{{artist.id}}</label></td>
+                </tr>
+                <tr>
+                    <td><label>name: </label></td>
+                    <td><textarea id="txtName" style="height:20px; resize:none">{{artist.name}}</textarea></td>
+                </tr>
+            </table>
+        </div>
+        <div id="divFeedback"></div>
+        <div>
+            <button id="btnUpdate">Update</button>
+            <button id="btnCancel">Cancel</button>
+        </div>
+    </body>
+ </html>
