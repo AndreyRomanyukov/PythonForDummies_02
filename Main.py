@@ -1,20 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
+import datetime
+import json
+import urllib2
+
 import tornado.httpserver
 import tornado.ioloop
 import tornado.options
 import tornado.web
-import os
-import datetime
+
 from sqlalchemy import create_engine
 from sqlalchemy import orm
 from sqlalchemy import Table, MetaData
 from sqlalchemy import func
 from sqlalchemy.orm.exc import NoResultFound
-import json
 
-import urllib2
+
+
 
 
 from tornado.options import define, options
@@ -64,9 +68,9 @@ class Echo2PageHandler(tornado.web.RequestHandler):
 
 class ArtistsPageHandler(tornado.web.RequestHandler):
     def get(self):
-        artists = orm_session.query(Artist).\
-                              order_by(Artist.name).\
-                              filter(Artist.deleted != True)
+        artists = (orm_session.query(Artist)
+                              .order_by(Artist.name)
+                              .filter(Artist.deleted != True))
 
         self.render("templates/music_catalog/artists.html",
                     artists = artists)
@@ -76,10 +80,10 @@ class ArtistPageHandler(tornado.web.RequestHandler):
         uri = self.request.uri
         artist_name = uri.split('/')[-1]
 
-        albums = orm_session.query(Album).\
-                             join(Artist, Album.artist_id == Artist.id).\
-                             filter(func.lower(Artist.name) == artist_name.lower()).\
-                             order_by(Album.year)
+        albums = (orm_session.query(Album)
+                             .join(Artist, Album.artist_id == Artist.id)
+                             .filter(func.lower(Artist.name) == artist_name.lower())
+                             .order_by(Album.year))
 
         self.render("templates/music_catalog/albums.html",
             artist_name = urllib2.unquote(artist_name),
@@ -97,9 +101,9 @@ class DeleteArtistPageHandler(tornado.web.RequestHandler):
         artist_id = uri.split('/')[-1]
 
         try:
-            artist = orm_session.query(Artist).\
-                          filter(Artist.id == artist_id).\
-                          one()
+            artist = (orm_session.query(Artist)
+                                 .filter(Artist.id == artist_id)
+                                .one())
 
             self.render("templates/music_catalog/delete_artist.html",
                         artist = artist)
@@ -113,9 +117,9 @@ class UpdateArtistPageHandler(tornado.web.RequestHandler):
         artist_id = uri.split('/')[-1]
 
         try:
-            artist = orm_session.query(Artist).\
-                          filter(Artist.id == artist_id).\
-                          one()
+            artist = (orm_session.query(Artist)
+                                 .filter(Artist.id == artist_id)
+                                 .one())
 
             self.render("templates/music_catalog/update_artist.html",
                         artist = artist)
@@ -124,90 +128,104 @@ class UpdateArtistPageHandler(tornado.web.RequestHandler):
 
 
 class AjaxEcho(tornado.web.RequestHandler):
-    #@is_ajax # is_ajax decorators.
     def get(self):
         function_name = self.get_argument("f", default=None, strip=False)
 
-        if (function_name == "getSimpleAnswer"):
-            result = str(datetime.datetime.now().time().isoformat()) + " SimpleAnswer: OK!"
-            json_result = '{{"result": "{0}"}}'.format(result)
-            self.write(json_result)
-        elif (function_name == "getArtist"):
-            result = "false"
+        handlers = {
+            'getSimpleAnswer': self.get_simple_answer,
+            'getArtist': self.get_artist,
+            'ifArtistExist': self.if_artist_exist,
+            'insertArtist': self.insert_artist,
+            'deleteArtist': self.delete_artist,
+            'updateArtist': self.update_artist,
+        }
+        default_handler = lambda: {'result': 'not implemented'}
 
-            artist_id = self.get_argument("id", default=None, strip=False)
+        handler = handlers.get(function_name, default_handler)
+        self.write(handler())
+        return
 
-            try:
-                artist = orm_session.query(Artist).\
-                              filter(Artist.id == artist_id).\
-                              one()
+    def get_simple_answer(self):
+        result = str(datetime.datetime.now().time().isoformat()) + " SimpleAnswer: OK!"
+        json_result = json.dumps({"result": result})
+        return json_result
 
-                json_result = '{{"id": "{0}", "name": "{0}"}}'.format(artist.name.id, artist.name)
-            except NoResultFound, e:
-                json_result = '{{"result": "{0}"}}'.format("NoResultFound")
+    def get_artist(self):
+        result = "false"
 
-            self.write(json_result)
-        elif (function_name == "ifArtistExist"):
-            result = "false"
+        artist_id = self.get_argument("id", default=None, strip=False)
 
-            artist_name = self.get_argument("name", default=None, strip=False)
+        try:
+            artist = (orm_session.query(Artist)
+                                 .filter(Artist.id == artist_id)
+                                 .one())
 
-            artists = orm_session.query(Artist).\
-                                  filter(func.lower(Artist.name) == artist_name.lower()).\
-                                  filter(Artist.deleted != True)
+            json_result = json.dumps({"id": artist.name.id, "name": artist.name})
+        except NoResultFound, e:
+            json_result = json.dumps({"result": "NoResultFound"})
 
-            if (artists.count() > 0):
-                result = "true"
+        return json_result
 
-            json_result = '{{"result": "{0}"}}'.format(result)
-            self.write(json_result)
-        elif (function_name == "insertArtist"):
-            result = -1
+    def if_artist_exist(self):
+        result = "false"
 
-            artist_name = self.get_argument("name", default=None, strip=False)
+        artist_name = self.get_argument("name", default=None, strip=False)
 
-            newArtist = Artist()
-            newArtist.name = artist_name
+        artists = (orm_session.query(Artist)
+                              .filter(func.lower(Artist.name) == artist_name.lower())
+                              .filter(Artist.deleted != True))
 
-            orm_session.add(newArtist)
-            orm_session.commit()
+        if (artists.count() > 0):
+            result = "true"
 
-            result = newArtist.id
+        json_result = json.dumps({"result": result})
+        return json_result
 
-            json_result = json.dumps({"id": result}, separators=(',',':'))
-            self.write(json_result)
-        elif (function_name == "deleteArtist"):
-            artist_id = self.get_argument("id", default=None, strip=False)
+    def insert_artist(self):
+        result = -1
 
-            artist = orm_session.query(Artist).\
-                          filter(Artist.id == artist_id).\
-                          one()
+        artist_name = self.get_argument("name", default=None, strip=False)
 
-            artist.deleted = True
-            orm_session.commit()
+        newArtist = Artist()
+        newArtist.name = artist_name
 
-            json_result = '{{"result": "{0}"}}'.format("ok")
+        orm_session.add(newArtist)
+        orm_session.commit()
 
-            self.write(json_result)
-        elif (function_name == "updateArtist"):
-            artist_id = self.get_argument("id", default=None, strip=False)
-            artist_name = self.get_argument("name", default=None, strip=False)
+        result = newArtist.id
 
-            artist = orm_session.query(Artist).\
-                          filter(Artist.id == artist_id).\
-                          one()
+        json_result = json.dumps({"id": result})
+        return json_result
 
-            artist.name = artist_name
+    def delete_artist(self):
+        artist_id = self.get_argument("id", default=None, strip=False)
 
-            orm_session.commit()
+        artist = (orm_session.query(Artist)
+                             .filter(Artist.id == artist_id)
+                             .one())
 
-            json_result = '{{"result": "{0}"}}'.format("ok")
+        artist.deleted = True
+        orm_session.commit()
 
-            self.write(json_result)
-        else:
-            result = str(datetime.datetime.now().time().isoformat()) + " This function is not implemented yet"
-            json_result = '{{"result": "{0}"}}'.format(result)
-            self.write(json_result)
+        json_result = json.dumps({"result": "ok"})
+
+        return json_result
+
+    def update_artist(self):
+        artist_id = self.get_argument("id", default=None, strip=False)
+        artist_name = self.get_argument("name", default=None, strip=False)
+
+        artist = (orm_session.query(Artist)
+                             .filter(Artist.id == artist_id)
+                             .one())
+
+        artist.name = artist_name
+
+        orm_session.commit()
+
+        json_result = {"result": "ok"}
+
+        return json_result
 
 
 def main():

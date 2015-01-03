@@ -1,8 +1,10 @@
 var ajaxDataProvider = {
+    urlServer: "http://localhost:12345/server",
+
     getSimpleAnswer: function (callback) {
         $.ajax({
             type: "GET",
-            url: urlServer,
+            url: this.urlServer,
             data: {
                 f: 'getSimpleAnswer',
             },
@@ -25,7 +27,7 @@ var ajaxDataProvider = {
     ifArtistExist: function (name, callback) {
         $.ajax({
             type: "GET",
-            url: urlServer,
+            url: this.urlServer,
             data: {
                 f: 'ifArtistExist',
                 name: name,
@@ -49,7 +51,7 @@ var ajaxDataProvider = {
     insertArtist: function (name, callback) {
         $.ajax({
             type: "GET",
-            url: urlServer,
+            url: this.urlServer,
             data: {
                 f: 'insertArtist',
                 name: name,
@@ -73,7 +75,7 @@ var ajaxDataProvider = {
     deleteArtist: function (id, callback) {
         $.ajax({
             type: "GET",
-            url: urlServer,
+            url: this.urlServer,
             data: {
                 f: 'deleteArtist',
                 id: id,
@@ -97,7 +99,7 @@ var ajaxDataProvider = {
     updateArtist: function (id, name, callback) {
         $.ajax({
             type: "GET",
-            url: urlServer,
+            url: this.urlServer,
             data: {
                 f: 'updateArtist',
                 id: id,

@@ -1,5 +1,3 @@
-var urlServer = "http://localhost:12345/server"
-
 $(window).load(function () {
     Init();
 });

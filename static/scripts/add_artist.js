@@ -1,4 +1,3 @@
-var urlServer = "http://localhost:12345/server"
 var getUrl = window.location;
 var hostUrl = getUrl.protocol + "//" + getUrl.host;
 
